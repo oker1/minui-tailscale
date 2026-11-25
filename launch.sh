@@ -240,7 +240,15 @@ main_screen() {
         fi
     fi
 
-    minui-list --file "$minui_list_file" --format json --title "$HUMAN_READABLE_NAME" --confirm-text "SAVE" --item-key "settings" --write-value state
+    # stdout can contain SDK log lines, so read the result from a file
+    minui_list_output="/tmp/${PAK_NAME}-minui-list-output.json"
+    rm -f "$minui_list_output"
+    minui-list --file "$minui_list_file" --format json --title "$HUMAN_READABLE_NAME" --confirm-text "SAVE" --item-key "settings" --write-value state --write-location "$minui_list_output" >/dev/null
+    exit_code=$?
+    if [ "$exit_code" -ne 0 ]; then
+        return "$exit_code"
+    fi
+    cat "$minui_list_output"
 }
 
 cleanup() {
@@ -248,6 +256,7 @@ cleanup() {
     rm -f "/tmp/${PAK_NAME}-new-settings.json"
     rm -f "/tmp/${PAK_NAME}-settings.json"
     rm -f "/tmp/${PAK_NAME}-minui-list.json"
+    rm -f "/tmp/${PAK_NAME}-minui-list-output.json"
     rm -f /tmp/stay_awake
     killall minui-presenter >/dev/null 2>&1 || true
 }
@@ -319,7 +328,11 @@ main() {
         new_settings="$(main_screen "$settings")"
         exit_code=$?
         # exit codes: 2 = back button, 3 = menu button
+        if [ "$exit_code" -eq 2 ] || [ "$exit_code" -eq 3 ]; then
+            break
+        fi
         if [ "$exit_code" -ne 0 ]; then
+            show_message "minui-list failed with exit code $exit_code." 2
             break
         fi
 
